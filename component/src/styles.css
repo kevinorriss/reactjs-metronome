@@ -1,0 +1,74 @@
+.metronome {
+    display: flex;
+    flex-direction: column;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.metronome__top {
+    display:flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.metronome__bpm {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.metronome__bpm h1 {
+    margin: 0 0.3rem 0 0;
+}
+
+.metronome__bpm small {
+    color: #666;
+}
+
+.metronome__play-pause {
+    display:flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bolder;
+    height: 3rem;
+    width: 3rem;
+    border-radius: 50%;
+    background-color: cornflowerblue;
+    border: 0.5rem solid white;
+    color: white;
+    cursor: pointer;
+    transition: border-color 0.05s linear;
+}
+
+.metronome__play-pause--beat {
+    border-color: lightskyblue;
+}
+
+.metronome__slider {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding-top: 1rem;
+}
+
+.slider__button {
+    display:flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.5rem;
+    width: 1.5rem;
+    font-size: 0.8rem;
+    font-weight: bolder;
+    background-color: cornflowerblue;
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.slider__button--minus {
+    margin-right: 1rem;
+}
+
+.slider__button--plus {
+    margin-left: 1rem;
+}
