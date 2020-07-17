@@ -1,5 +1,5 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import Metronome from '@kevinorriss/metronome';
+import React from 'react'
+import ReactDOM from 'react-dom'
+import App from './App'
 
-ReactDOM.render(<Metronome/>, document.getElementById('root'));
+ReactDOM.render(<App />, document.getElementById('root'))
