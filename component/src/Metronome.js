@@ -1,120 +1,134 @@
 import React from 'react'
+import PropTypes from 'prop-types'
 import Slider from 'rc-slider'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay, faPause, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons'
+import metronomeWorker from './MetronomeWorker.js'
 import 'rc-slider/assets/index.css'
 import './styles.css'
-import click from './click.mp3'
 
 class Metronome extends React.Component {
-    constructor(props) {
-        super(props)
+    constructor({startBpm=100, minBpm=40, maxBpm=200, volume=0.1, frequency=440.0, ...props}) {
+        super()
 
-        // bind the functions
-        this.setBpm = this.setBpm.bind(this)
+        // instance variables
+        this.minBpm = minBpm
+        this.maxBpm = maxBpm
+        this.volume = volume
+        this.frequency = frequency
+        this.nextNoteTime = 0.0
+        this.secondsPerBeat = 60.0 / startBpm
+
+        // custom style objects
+        this.playPauseStyle = props.playPauseStyle ?? {}
+        this.bpmStyle = props.bpmStyle ?? {}
+        this.bpmTagStyle = props.bpmTagStyle ?? {}
+        this.plusStyle = props.plusStyle ?? {}
+        this.minusStyle = props.minusStyle ?? {}
+        this.handleStyle = props.handleStyle ?? {}
+        this.trackStyle = props.trackStyle ?? {}
+        this.railStyle = props.railStyle ?? {}
+        this.sliderStyle = props.sliderStyle ?? {}
+
+        // initial state
+        this.state = {
+            bpm: startBpm,
+            playing: false
+        }
+
+        // bind functions
+        this.initAudio = this.initAudio.bind(this)
+        this.handlePlayPause = this.handlePlayPause.bind(this)
         this.handleDecrement = this.handleDecrement.bind(this)
         this.handleIncrement = this.handleIncrement.bind(this)
-        this.handlePlayPause = this.handlePlayPause.bind(this)
-        this.playClick = this.playClick.bind(this)
-        this.removeBeatClass = this.removeBeatClass.bind(this)
-
-        // set the initial state
-        this.state = {
-            min: 40,        // the minimum BPM allowed
-            bpm: 100,       // the default BPM
-            max: 218,       // the maximum BPM allowed
-            active: false,  // true when the metronome is on
-            interval: 600,  // the milliseconds between each click (600 = 100 BPM)
-            beating: false  // true when play/pause button beat CSS is transitioning
-        }
+        this.handleChange = this.handleChange.bind(this)
+        this.tick = this.tick.bind(this)
     }
 
-    /**
-    * Sets the beats per minute of the metronome in the state
-    * Will ignore values outside of the min/max range
-    *
-    * @param {Number} bpm The beats per minute to set
-    */
-    setBpm(bpm) {
-        // return early if the new value is outside of accepted range
-        if (bpm < this.state.min || bpm > this.state.max) {
-            return
+    componentDidMount() {
+        // create a worker which runs an interval on a separate thread calling the tick function
+        this.timerWorker = new Worker(window.URL.createObjectURL(new Blob([metronomeWorker])))
+
+        // setup the listener for the tick message
+        this.timerWorker.onmessage = ({ data }) => { data === "tick" && this.tick() }
+
+        // set the interval on the worker
+        this.timerWorker.postMessage({message: "interval", interval: 25.0})
+    }
+
+    componentWillUnmount() {
+        // tell the worker to stop and close itself, rather than calling terminate from this scope
+        this.timerWorker.postMessage({message: "close"})
+    }
+
+    // creates the audio context and buffer, sets the volume and starts playing
+    initAudio() {
+        // create the audio context
+        this.audioContext = new AudioContext()
+
+        this.volumeNode = this.audioContext.createGain()
+        this.volumeNode.gain.value = this.volume
+        this.volumeNode.connect(this.audioContext.destination)
+
+        // create a buffer source and add the buffer
+        var source = this.audioContext.createBufferSource()
+        source.buffer = this.audioContext.createBuffer(1, 1, 22050)
+
+        // start playing the audio data immediately
+        source.start(0)
+    }
+
+    handlePlayPause() {
+        // if the audio context hasn't been created, we need to set it up
+        // we must create the audio context after a user gesture (browser autoplay policy)
+        if (this.audioContext == null) {
+            this.initAudio()
         }
 
-        // set the BPM and calculate the milliseconds interval between clicks
-        // 60,000 ms = 1 minute so 60,000 / BPM is the time between beats
+        // start or stop the interval loop in the worker
+        this.timerWorker.postMessage({message: !this.state.playing ? "start" : "stop" })
+
+        // update the state so the play/pause icon re-renders
         this.setState((prevState) => ({
             ...prevState,
-            bpm,
-            interval: 60000.0 / bpm
+            playing: !prevState.playing
         }))
     }
 
-    /**
-    * Called when the "minus" button is clicked
-    * Decrements the BPM value by 1
-    */
-    handleDecrement() {
-        this.setBpm(this.state.bpm - 1)
-    }
-
-    /**
-    * Called when the "plus" button is clicked
-    * Increments the BPM value by 1
-    */
-    handleIncrement() {
-        this.setBpm(this.state.bpm + 1)
-    }
-
-    /**
-     * Called when the "play" / "pause" button is clicked
-     * Toggles between play and pause
-     */
-    handlePlayPause() {
-        // set active to its NOT value
+    // event handlers for changing the BPM, clamps the value between MIN/MAX
+    handleDecrement() { this.handleChange(this.state.bpm-1) }
+    handleIncrement() { this.handleChange(this.state.bpm+1) }
+    handleChange(newBpm) {
+        if (newBpm < this.minBpm || newBpm > this.maxBpm) return
         this.setState((prevState) => ({
             ...prevState,
-            active: !prevState.active
-        }), () => {
-            // if "play" button clicked then start the beating
-            if (this.state.active) {
-                setTimeout(this.playClick, this.state.interval, new Audio(click))
-            }
+            bpm: newBpm
+        }), ()=> {
+            this.secondsPerBeat = 60.0 / this.state.bpm
         })
     }
+    
+    // fired when a tick message is received from the interval worker (only when playing)
+    tick() {
+        // when it is time to schedule a note to play
+        // we use while becuase audioContext time is incrementing even when paused
+        // so we loop until the nextNoteTime catches up
+        while (this.nextNoteTime < this.audioContext.currentTime + 0.1 ) {
+        
+            // create an oscillator which generates a constant tone (a beep)
+            var osc = this.audioContext.createOscillator()
+            osc.connect( this.volumeNode )
+            osc.frequency.value = this.frequency
+        
+            // start the beep at the next note time
+            osc.start( this.nextNoteTime )
 
-    /**
-     * Recursive function that calls itself in a timeout at the interval
-     * calculated by the current BPM
-     * 
-     * @param {Audio} audio The sound to play on the beat
-     */
-    playClick(audio) {
-        // play the beat sound
-        audio.play()
-
-        // if the metronome is playing, schedule the next beat
-        // instantiate the audio object now, this prevents an initial stutter
-        if (this.state.active) {
-            setTimeout(this.playClick, this.state.interval, new Audio(click))
+            // stop the beep after at the note length
+            osc.stop( this.nextNoteTime + 0.075 )
+            
+            // calculate the time of the next note
+            this.nextNoteTime += this.secondsPerBeat
         }
-
-        // set the state to beating to start the CSS transition on the play/pause button
-        this.setState((prevState) => ({
-            ...prevState,
-            beating: true
-        }))
-    }
-
-    /**
-     * Called when the CSS border transition on the play/pause button is complete
-     * Resets the beating state so that the CSS class is removed
-     */
-    removeBeatClass() {
-        this.setState((prevState) => ({
-            ...prevState,
-            beating: false
-        }))
     }
 
     render() {
@@ -122,28 +136,50 @@ class Metronome extends React.Component {
             <div className="metronome">
                 <div className="metronome__top">
                     <div className="metronome__bpm">
-                        <h1>{this.state.bpm}</h1>
-                        <small>BPM</small>
+                        <h1 style={this.bpmStyle}>{this.state.bpm}</h1>
+                        <small style={this.bpmTagStyle}>BPM</small>
                     </div>
-                    <div className={"metronome__play-pause" + (this.state.beating ? " metronome__play-pause--beat" : "")}
-                        onClick={this.handlePlayPause} 
-                        onTransitionEnd={this.removeBeatClass}
-                    >
-                        <FontAwesomeIcon icon={this.state.active ? faPause : faPlay} />
+                    <div className="metronome__play-pause" onClick={this.handlePlayPause} style={this.playPauseStyle} >
+                        <FontAwesomeIcon icon={this.state.playing ? faPause : faPlay} />
                     </div>
                 </div>
-                <div className="metronome__slider">
-                    <div className="slider__button slider__button--minus" onClick={this.handleDecrement}>
+                <div className="metronome__slider" style={this.sliderStyle}>
+                    <div className="slider__button slider__button--minus" onClick={this.handleDecrement} style={this.minusStyle}>
                         <FontAwesomeIcon icon={faMinus} />
                     </div>
-                    <Slider min={this.state.min} max={this.state.max} step={1} value={this.state.bpm} onChange={this.setBpm} />
-                    <div className="slider__button slider__button--plus" onClick={this.handleIncrement}>
+                    <Slider
+                        min={this.minBpm}
+                        max={this.maxBpm}
+                        step={1}
+                        value={this.state.bpm}
+                        onChange={this.handleChange}
+                        trackStyle={this.trackStyle}
+                        handleStyle={this.handleStyle}
+                        railStyle={this.railStyle} />
+                    <div className="slider__button slider__button--plus" onClick={this.handleIncrement} style={this.plusStyle}>
                         <FontAwesomeIcon icon={faPlus} />
                     </div>
                 </div>
             </div>
         )
     }
+}
+
+Metronome.propTypes = {
+    playPauseStyle: PropTypes.object,
+    bpmStyle: PropTypes.object,
+    bpmTagStyle: PropTypes.object,
+    plusStyle: PropTypes.object,
+    minusStyle: PropTypes.object,
+    handleStyle: PropTypes.object,
+    trackStyle: PropTypes.object,
+    railStyle: PropTypes.object,
+    sliderStyle: PropTypes.object,
+    minBpm: PropTypes.number,
+    maxBpm: PropTypes.number,
+    startBpm: PropTypes.number,
+    volume: PropTypes.number,
+    frequency: PropTypes.number
 }
 
 export default Metronome
