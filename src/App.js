@@ -10,7 +10,11 @@ const App = () => {
                 <li><Link to="/other">Other</Link></li>
             </ul>
             <Switch>
-                <Route exact path="/" component={Metronome} />
+                <Route exact path="/">
+                    <div style={{ width: '15rem', backgroundColor: 'lightgrey', border: '1px solid black', padding: '1rem' }}>
+                        <Metronome />
+                    </div>
+                </Route>
                 <Route exact path="/other">
                     <p>Other</p>
                 </Route>

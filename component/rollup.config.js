@@ -1,28 +1,26 @@
-import babel from 'rollup-plugin-babel'
-import { uglify } from 'rollup-plugin-uglify'
-import postcss from 'rollup-plugin-postcss'
-import url from 'rollup-plugin-url'
+import babel from "@rollup/plugin-babel"
+import { terser } from "rollup-plugin-terser"
+import { string } from "rollup-plugin-string"
+import postcss from "rollup-plugin-postcss"
 
 const config = {
     input: 'src/Metronome.js',
-    external: ['react'],
+    external: ['react', 'prop-types', 'rc-slider', '@fortawesome/react-fontawesome', '@fortawesome/free-solid-svg-icons', 'rc-slider/assets/index.css'],
     plugins: [
-        url({
-            include: ["**/*.mp3"]
-        }),
-        postcss({
-            extensions: ['.css']
-        }),
-        babel({
-            exclude: "node_modules/**"
-        }),
-        uglify()
+        postcss({ extensions: ['.css'] }),
+        babel({ exclude: '/node_modules/', babelHelpers: 'bundled' }),
+        string({ include: "**/MetronomeWorker.js" }),
+        terser()
     ],
     output: {
         format: 'umd',
         name: 'metronome',
         globals: {
-            react: "React"
+            'react': 'React',
+            'prop-types': 'PropTypes',
+            'rc-slider': 'rc-slider',
+            '@fortawesome/react-fontawesome': '@fortawesome/react-fontawesome',
+            '@fortawesome/free-solid-svg-icons': '@fortawesome/free-solid-svg-icons'
         }
     }
 }
