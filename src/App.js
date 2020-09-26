@@ -1,6 +1,6 @@
 import React from 'react'
 import { BrowserRouter as Router, Route, Switch, Link } from 'react-router-dom'
-import Metronome from '@kevinorriss/metronome'
+import Metronome from '@kevinorriss/react-metronome'
 
 const App = () => {
     return (

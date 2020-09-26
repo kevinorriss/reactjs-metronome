@@ -9,7 +9,8 @@ doesn't suffer from the non-guaranteed nature of Javascript's setInterval functi
 
 ## Prerequisites
 
-* [React ^16.9.0](https://reactjs.org/) - Javascript library for user interfaces
+* [React 16.x](https://reactjs.org/) - Javascript library for user interfaces
+* [PropTypes 15.x](https://www.npmjs.com/package/prop-types/) - Runtime type checking for React props
 
 ## Installing
 
@@ -80,15 +81,11 @@ Whenever you make a change to the component code, the react app will update.
 
 ## Tests
 ```
+cd component
 npm test
 ```
 
-TODO run the tests
-TODO check github dependabot issues
-
 This project uses Jest and Enzyme for its unit tests, simply run the above code to run the test suites.
-
-If you want the tests to run during development, you will need to have rollup watching too!
 
 ## Author
 

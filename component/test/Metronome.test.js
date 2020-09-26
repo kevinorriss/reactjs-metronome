@@ -93,3 +93,8 @@ it('should clamp bpm to max value', () => {
 
     expect(renderer.create(<Metronome />).toJSON()).toMatchSnapshot()
 })
+
+it('should post close to worker on unmount', () => {
+    wrapper.unmount()
+    expect(postMessage).toHaveBeenLastCalledWith({ message: "close" })
+})
